@@ -2,6 +2,9 @@
 
 Minijuego 2D de fútbol 5 (5 vs 5) con HTML5 Canvas y JavaScript puro.
 
+## Controles
+Flechas o WASD: mover. Espacio: patear. E: cambiar de jugador. R: reiniciar al terminar.
+
 ## Cómo probarlo
 Usa módulos ES, así que no se abre con doble clic en el archivo.
 En VS Code: extensión **Live Server** → clic derecho en `index.html` → *Open with Live Server*.

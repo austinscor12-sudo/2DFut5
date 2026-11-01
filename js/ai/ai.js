@@ -3,7 +3,7 @@ import { PITCH, FIELD } from '../config.js';
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
 // A dónde tiene que ir un jugador controlado por la computadora
-export function aiTarget(player, game) {
+export function aiTarget(player, game, awayChaser) {
   const ball = game.ball;
 
   if (player.role === 'gk') {
@@ -12,7 +12,7 @@ export function aiTarget(player, game) {
     return { x, y: clamp(ball.y, PITCH.cy - half, PITCH.cy + half), speed: 0.9 };
   }
 
-  if (game.chaser(player.team) === player) {
+  if (player === awayChaser) {
     return { x: ball.x, y: ball.y, speed: 1 };
   }
 
