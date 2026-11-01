@@ -9,8 +9,33 @@
 <body>
   <main>
     <canvas id="game"></canvas>
-    <p class="help">Mover: flechas o WASD &nbsp;|&nbsp; Patear: barra espaciadora &nbsp;|&nbsp; Cambiar jugador: E &nbsp;|&nbsp; Reiniciar (al terminar): R</p>
+    <p class="help">
+      Mover: flechas o WASD · Correr: Shift · Tiro: mantené Espacio y soltá · Pase: F · Cambiar jugador: E · Menú: Esc
+    </p>
   </main>
+
+  <section id="menu" class="menu">
+    <div class="panel" id="menu-home">
+      <h1>Fut5</h1>
+      <p class="sub">5 contra 5, tres minutos.</p>
+      <div class="actions column">
+        <button id="btn-resume" hidden>Continuar partido</button>
+        <button id="btn-play">Jugar</button>
+        <button id="btn-edit" class="ghost">Editar jugadores</button>
+      </div>
+    </div>
+
+    <div class="panel wide" id="menu-edit" hidden>
+      <h2>Jugadores</h2>
+      <p class="sub">Nombre, número, color de piel y atributos de 1 a 10. Se guarda en este navegador.</p>
+      <div id="roster" class="roster"></div>
+      <div class="actions">
+        <button id="btn-save">Guardar y volver</button>
+        <button id="btn-reset" class="ghost">Restaurar originales</button>
+      </div>
+    </div>
+  </section>
+
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

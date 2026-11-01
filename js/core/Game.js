@@ -1,4 +1,7 @@
-import { MATCH_SECONDS, GOAL_PAUSE_SECONDS, BALL, PLAYER, TEAM_NAMES, PITCH, FIELD } from '../config.js';
+import {
+  MATCH_SECONDS, GOAL_PAUSE_SECONDS, BALL, PLAYER, TEAM_NAMES,
+  PITCH, FIELD, SPRINT, SHOT, PASS, scale,
+} from '../config.js';
 import { PLAYERS } from '../data/players.js';
 import { Player } from '../entities/Player.js';
 import { Ball } from '../entities/Ball.js';
@@ -7,9 +10,9 @@ import { aiTarget, aiAim } from '../ai/ai.js';
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
 export class Game {
-  constructor(input) {
+  constructor(input, playersData = PLAYERS) {
     this.input = input;
-    this.players = PLAYERS.map((d) => new Player(d));
+    this.players = playersData.map((d) => new Player(d));
     this.ball = new Ball();
     this.restart();
   }
@@ -32,8 +35,8 @@ export class Game {
 
   dist(p) { return Math.hypot(p.x - this.ball.x, p.y - this.ball.y); }
 
-  // Con quién jugás: el local más cercano a la pelota, pero sin cambiar a cada rato.
-  // Con la tecla E forzás el cambio al jugador más cercano.
+  // Con quién jugás: el local más cercano a la pelota, sin cambiar a cada rato.
+  // Con la tecla E forzás el cambio.
   pickHuman() {
     const outfield = this.players
       .filter((p) => p.team === 'home' && p.role !== 'gk')
@@ -84,22 +87,24 @@ export class Game {
     const awayChaser = this.chaser('away');
 
     for (const p of this.players) {
-      let wantsKick, aim;
-
       if (p.controlled) {
         const d = this.input.direction();
-        p.setDirection(d.x, d.y);
-        wantsKick = this.input.isKick();
-        aim = p.facing;
+        const sprinting = this.input.isSprint() && (d.x || d.y) && !p.exhausted;
+        p.setDirection(d.x, d.y, sprinting ? SPRINT.multiplier : 1);
+        p.updateStamina(sprinting, dt);
+        this.humanActions(p, dt);
       } else {
+        p.charge = 0;
         const t = aiTarget(p, this, awayChaser);
         p.moveToward(t.x, t.y, t.speed);
-        wantsKick = p.role === 'gk' || p === awayChaser;
-        aim = aiAim(p);
+        p.updateStamina(false, dt);
+        if (p.role === 'gk' || p === awayChaser) {
+          p.queueKick(aiAim(p), BALL.kickPower * 0.85 * scale(p.stats.shot));
+        }
       }
 
       p.update(dt);
-      this.contact(p, wantsKick, aim);
+      this.contact(p);
     }
 
     this.separatePlayers();
@@ -116,7 +121,43 @@ export class Game {
     this.rescueStuckBall(dt);
   }
 
-  contact(p, wantsKick, aim) {
+  // Tiro con carga (Espacio) y pase (F)
+  humanActions(p, dt) {
+    if (this.input.isKick()) p.charge = Math.min(1, p.charge + dt / SHOT.chargeTime);
+
+    if (this.input.consumeRelease('Space')) {
+      const power = SHOT.minPower + (1 - SHOT.minPower) * p.charge;
+      p.queueKick(p.facing, BALL.kickPower * power * scale(p.stats.shot));
+      p.charge = 0;
+    }
+
+    if (this.input.consumePress('KeyF')) {
+      const { aim, power } = this.passFor(p);
+      p.queueKick(aim, power * scale(p.stats.pass));
+    }
+  }
+
+  // Elige al compañero más alineado con hacia dónde mira el jugador
+  passFor(p) {
+    let best = null, bestScore = -Infinity;
+    for (const m of this.players) {
+      if (m === p || m.team !== p.team) continue;
+      const dx = m.x - p.x, dy = m.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < 40) continue;
+      const dot = (dx * p.facing.x + dy * p.facing.y) / d;
+      if (dot < PASS.aimCone) continue;
+      const score = dot - d / 1200;
+      if (score > bestScore) { best = { x: dx / d, y: dy / d, d }; bestScore = score; }
+    }
+    if (!best) return { aim: p.facing, power: PASS.maxPower * 0.8 };
+    return {
+      aim: { x: best.x, y: best.y },
+      power: clamp(best.d * 1.25 + 80, PASS.minPower, PASS.maxPower),
+    };
+  }
+
+  contact(p) {
     const b = this.ball;
     const dx = b.x - p.x, dy = b.y - p.y;
     const dist = Math.hypot(dx, dy) || 0.001;
@@ -124,8 +165,8 @@ export class Game {
     if (dist >= min) return;
 
     const nx = dx / dist, ny = dy / dist;
-    let targetX = p.x + nx * min;
-    let targetY = p.y + ny * min;
+    const targetX = p.x + nx * min;
+    const targetY = p.y + ny * min;
 
     // ¿La pelota quedaría contra la pared? Entonces se corre el jugador, no la pelota.
     const inGoalMouth = Math.abs(b.y - PITCH.cy) < FIELD.goalWidth / 2;
@@ -145,13 +186,17 @@ export class Game {
       b.x = targetX; b.y = targetY;
     }
 
-    if (wantsKick && p.kickTimer <= 0) {
-      b.vx = aim.x * BALL.kickPower;
-      b.vy = aim.y * BALL.kickPower;
+    const q = p.kickQueue;
+    if (q && p.kickTimer <= 0) {
+      b.vx = q.aim.x * q.power;
+      b.vy = q.aim.y * q.power;
       p.kickTimer = PLAYER.kickCooldown;
+      p.kickQueue = null;
     } else if (!blocked) {
-      b.vx = b.vx * 0.5 + (p.vx * 1.2 + nx * 60) * 0.5;
-      b.vy = b.vy * 0.5 + (p.vy * 1.2 + ny * 60) * 0.5;
+      // más control = la pelota se pega más al pie
+      const k = 0.5 + p.stats.control * 0.04;
+      b.vx = b.vx * (1 - k) + (p.vx * 1.2 + nx * 60) * k;
+      b.vy = b.vy * (1 - k) + (p.vy * 1.2 + ny * 60) * k;
     }
   }
 

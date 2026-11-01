@@ -11,6 +11,7 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, FIELD.width, FIELD.height);
     this.drawPitch();
+    if (!game) return;
     game.players.forEach((p) => this.drawPlayer(p));
     this.drawBall(game.ball);
     this.drawHud(game);
@@ -81,6 +82,29 @@ export class Renderer {
     ctx.font = '12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(p.name, p.x, p.y - p.radius - 6);
+
+    if (p.controlled) this.drawBars(p);
+  }
+
+  // Resistencia (verde) y carga del tiro (amarillo) del jugador que manejás
+  drawBars(p) {
+    const ctx = this.ctx;
+    const w = 34, h = 4;
+    const x = p.x - w / 2;
+    const y = p.y + p.radius + 7;
+
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = p.exhausted ? '#ef6c00' : '#7bd88f';
+    ctx.fillRect(x, y, w * p.stamina, h);
+
+    if (p.charge > 0) {
+      const y2 = y + h + 2;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(x, y2, w, h);
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillRect(x, y2, w * p.charge, h);
+    }
   }
 
   drawBall(b) {
