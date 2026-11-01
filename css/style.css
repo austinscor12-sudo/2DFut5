@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: #14201a;
+  color: #dfe9e2;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+main { width: 100%; max-width: 900px; padding: 8px; text-align: center; }
+canvas { width: 100%; height: auto; border-radius: 6px; background: #2e7d32; touch-action: none; }
+.help { font-size: 14px; opacity: .75; }
